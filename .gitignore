@@ -8,6 +8,7 @@ __pycache__/
 
 # Local downloads
 dataset/
+images_to_resize/
 *.pt
 *.zip
 
