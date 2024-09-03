@@ -9,7 +9,6 @@ from pathlib import Path
 import mlflow
 import pandas as pd
 import torch
-import ultralytics.utils
 import yaml
 from sklearn.model_selection import KFold
 
@@ -17,6 +16,8 @@ from sklearn.model_selection import KFold
 # an env var, it still tries to do multi-gpu training. This is a workaround to avoid that.
 # It's necessary to do this before importing ultralytics
 os.environ["RANK"] = "-1"
+
+import ultralytics.utils
 from ultralytics import YOLO
 from label_studio_sdk.converter import Converter
 from label_studio_sdk import Client as LabelStudioClient
@@ -165,13 +166,13 @@ class TrainingScript:
     def _download_labeled_dataset_images(self):
         labeled_tasks = self.label_studio_project.get_labeled_tasks()
         labeled_image_names = list(map(lambda task:
-                                       Path(task['data']['image']).name,
+                                       task['storage_filename'].split('images/')[1],
                                        labeled_tasks))
 
         all_dataset_image_paths = []
         for image_name in labeled_image_names:
             source_image_path = self.source_images_directory / image_name
-            destination_image_path = self.dataset_path / image_name
+            destination_image_path = self.dataset_path / image_name.split("/")[-1]
             all_dataset_image_paths.append(destination_image_path)
 
             google_cloud_image = self.source_images_bucket.blob(str(source_image_path))
