@@ -179,7 +179,7 @@ class TrainingScript:
 
         return sorted(all_dataset_image_paths)
 
-    def _create_single_dataset(self, annotations, class_names, images, datasets_path):
+    def _create_single_dataset(self, annotations, class_names, images, datasets_path, percentage):
         folder_name = 'single_dataset'
         model_info_dir = datasets_path / folder_name
         model_info_dir.mkdir(parents=True, exist_ok=True)
@@ -200,18 +200,14 @@ class TrainingScript:
                 },
                 ds_y,
             )
-        for image, label in zip(images, annotations):
-            shutil.copy(image, datasets_path / folder_name / 'train' / "images" / image.name)
-            shutil.copy(label, datasets_path / folder_name / 'train' / "labels" / label.name)
 
-        for i in range(9):
-            random_image_index = random.randint(0, len(images) - 1)
-            validation_image = images[random_image_index]
-            validation_label = annotations[random_image_index]
-            shutil.move(validation_image, datasets_path / folder_name / 'val' / "images" / validation_image.name)
-            shutil.move(validation_label, datasets_path / folder_name / 'val' / "labels" / validation_label.name)
-            images.pop(random_image_index)
-            annotations.pop(random_image_index)
+        images_to_move = int(images * percentage / 100)
+        random_image_indexes = random.sample(range(0, len(images) - 1), images_to_move)
+        for idx, (image, label) in enumerate(zip(images, annotations)):
+            val_or_train_folder = 'val' if idx in random_image_indexes else 'train'
+            shutil.copy(image, datasets_path / folder_name / val_or_train_folder / 'images' / image.name)
+            shutil.copy(label, datasets_path / folder_name / val_or_train_folder / 'labels' / label.name)
+
         return dataset_yaml
 
     def _create_k_folds(self, annotations, class_names, images, datasets_path):
