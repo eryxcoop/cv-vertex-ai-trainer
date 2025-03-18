@@ -6,7 +6,9 @@
   },
   "runArgs": [
     "--device",
-    "nvidia.com/gpu=all"
+    "nvidia.com/gpu=all",
+    "--ipc",
+    "host"
   ],
   "customizations": {
 		"vscode": {
