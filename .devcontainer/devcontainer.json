@@ -12,6 +12,9 @@
   "mounts": [
     "source=/secrets/mostro-sa-key.json,target=/secrets/mostro-sa-key.json,type=bind,readonly"
   ],
+  "containerEnv": {
+    "GOOGLE_APPLICATION_CREDENTIALS": "/secrets/mostro-sa-key.json"
+  },
   "customizations": {
     "vscode": {
       "extensions": [
