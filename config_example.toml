@@ -23,6 +23,7 @@ epochs = 1
 model = "yolov8n.pt"
 obb = false # Set to true when training an oriented bounding box model, see README for more details.
 image_size = "960, 540"
+validation_percentage = 0
 
 [mlflow]
 use_mlflow = false # Set to true when you want to save your model on MLFlow

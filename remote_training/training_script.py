@@ -2,6 +2,7 @@ import datetime
 import gc
 import logging
 import os
+import random
 import shutil
 from collections import Counter
 from pathlib import Path
@@ -38,6 +39,7 @@ class TrainingScript:
         self.training_results_path = self.save_path / "training_results"
         self.fold_datasets_path = self.save_path / "folds_datasets"
         self.single_dataset_path = self.save_path / "single_dataset"
+        self.validation_percentage = os.environ["VALIDATION_PERCENTAGE"]
 
         self.use_mlflow = (os.environ["USE_MLFLOW"] == "True")
         self.mlflow_model_name = os.environ["MLFLOW_MODEL_NAME"]
@@ -76,7 +78,8 @@ class TrainingScript:
                 self._clean_gpu_cache()  # This is necessary to avoid running out of memory
         else:
             dataset_path = self.single_dataset_path
-            dataset_yaml = self._create_single_dataset(annotations, class_names, images, dataset_path)
+            dataset_yaml = self._create_single_dataset(annotations, class_names, images, dataset_path,
+                                                       self.validation_percentage)
             model_name = "single_model"
             model = self._train_model(dataset_yaml, model_name)
             self._add_information_to_model_in_mlflow_if_neccesary()
@@ -178,7 +181,7 @@ class TrainingScript:
 
         return sorted(all_dataset_image_paths)
 
-    def _create_single_dataset(self, annotations, class_names, images, datasets_path):
+    def _create_single_dataset(self, annotations, class_names, images, datasets_path, val_percentage):
         folder_name = 'single_dataset'
         model_info_dir = datasets_path / folder_name
         model_info_dir.mkdir(parents=True, exist_ok=True)
@@ -199,13 +202,14 @@ class TrainingScript:
                 },
                 ds_y,
             )
-        for image, label in zip(images, annotations):
-            shutil.copy(image, datasets_path / folder_name / 'train' / "images" / image.name)
-            shutil.copy(label, datasets_path / folder_name / 'train' / "labels" / label.name)
 
-        first_image, first_label = self._get_first_image_with_any_annotation(images, annotations)
-        shutil.copy(first_image, datasets_path / folder_name / 'val' / "images" / first_image.name)
-        shutil.copy(first_label, datasets_path / folder_name / 'val' / "labels" / first_label.name)
+        images_to_move = max(int(images * val_percentage / 100), 1) # At least one image for validation
+        random_image_indexes = random.sample(range(0, len(images) - 1), images_to_move)
+        for idx, (image, label) in enumerate(zip(images, annotations)):
+            val_or_train_folder = 'val' if idx in random_image_indexes else 'train'
+            shutil.copy(image, datasets_path / folder_name / val_or_train_folder / 'images' / image.name)
+            shutil.copy(label, datasets_path / folder_name / val_or_train_folder / 'labels' / label.name)
+
         return dataset_yaml
 
     def _create_k_folds(self, annotations, class_names, images, datasets_path):

@@ -79,6 +79,7 @@ class CLI:
             source_images_bucket=config["google_cloud"].get("source_images_bucket"),
             source_images_directory=config["google_cloud"].get("source_images_directory"),
             trained_models_bucket=config["google_cloud"].get("trained_models_bucket"),
+            validation_percentage=config[""].get("single_dataset_val_percentage"),
         )
 
     def _run_remote(self, config, training_config):
@@ -128,6 +129,7 @@ class CLI:
             "SOURCE_IMAGES_BUCKET": str(training_config.source_images_bucket),
             "SOURCE_IMAGES_DIRECTORY": str(training_config.source_images_directory),
             "TRAINED_MODELS_BUCKET": str(training_config.trained_models_bucket),
+            "VALIDATION_PERCENTAGE": int(training_config.validation_percentage)
         }
 
 
@@ -150,6 +152,7 @@ class TrainingConfig:
     source_images_bucket: str
     source_images_directory: str
     trained_models_bucket: str
+    validation_percentage: int
     obb: bool = False
     use_kfold: bool = False
     use_mlflow: bool = False
@@ -157,7 +160,7 @@ class TrainingConfig:
     def __post_init__(self):
         required_fields = ["image_size", "epochs", "model", "label_studio_token", "label_studio_url",
                            "label_studio_project_id", "accelerator_count", "source_images_bucket",
-                           "source_images_directory", "trained_models_bucket"]
+                           "source_images_directory", "trained_models_bucket", "validation_percentage"]
 
         for field in required_fields:
             attr = self.__getattribute__(field)
