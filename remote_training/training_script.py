@@ -220,7 +220,8 @@ class TrainingScript:
                 ds_y,
             )
 
-        images_to_move = max(int(images * val_percentage / 100), 1) # At least one image for validation
+        print(f"IMAGENES: {images}")
+        images_to_move = max(int(len(images) * int(val_percentage) / 100), 1) # At least one image for validation
         random_image_indexes = random.sample(range(0, len(images) - 1), images_to_move)
         for idx, (image, label) in enumerate(zip(images, annotations)):
             val_or_train_folder = 'val' if idx in random_image_indexes else 'train'
