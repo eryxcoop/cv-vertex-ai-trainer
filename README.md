@@ -11,6 +11,8 @@ We are assuming:
 
 # Setup requirements
 
+**Python version: 3.10**
+
 1) Run `pip install -r requirements.txt`.
 
 2) Install `gcloud CLI`, refer to: https://cloud.google.com/sdk/docs/install?hl=es-419
