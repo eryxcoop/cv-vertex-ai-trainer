@@ -164,11 +164,28 @@ class TrainingScript:
             output_dir=str(output_dir_path),
             is_obb=True)
 
+    def extract_image_name(self, task):
+        # TODO REVISAR ESTO
+        import base64
+        from urllib.parse import urlparse, parse_qs
+
+        image_url = task["data"]["image"]
+        parsed_url = urlparse(image_url)
+        query = parse_qs(parsed_url.query)
+
+        if "fileuri" in query:
+            # Decodificar de base64 a string
+            fileuri_b64 = query["fileuri"][0]
+            fileuri = base64.b64decode(fileuri_b64).decode("utf-8")
+            # Obtener solo el nombre del archivo
+            return Path(fileuri).name
+        else:
+            # Fallback si no hay fileuri
+            return Path(parsed_url.path).name
+
     def _download_labeled_dataset_images(self):
         labeled_tasks = self.label_studio_project.get_labeled_tasks()
-        labeled_image_names = list(map(lambda task:
-                                       Path(task['data']['image']).name,
-                                       labeled_tasks))
+        labeled_image_names = list(map(self.extract_image_name, labeled_tasks))
 
         all_dataset_image_paths = []
         for image_name in tqdm(labeled_image_names):
@@ -207,8 +224,10 @@ class TrainingScript:
         random_image_indexes = random.sample(range(0, len(images) - 1), images_to_move)
         for idx, (image, label) in enumerate(zip(images, annotations)):
             val_or_train_folder = 'val' if idx in random_image_indexes else 'train'
-            shutil.copy(image, datasets_path / folder_name / val_or_train_folder / 'images' / image.name)
-            shutil.copy(label, datasets_path / folder_name / val_or_train_folder / 'labels' / label.name)
+            image_name = image.name.split("__", 1)[-1]
+            label_name = label.name.split("__", 1)[-1]
+            shutil.copy(image, datasets_path / folder_name / val_or_train_folder / 'images' / image_name)
+            shutil.copy(label, datasets_path / folder_name / val_or_train_folder / 'labels' / label_name)
 
         return dataset_yaml
 
