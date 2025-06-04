@@ -73,7 +73,7 @@ class TrainingScript:
                 dataset_yaml = dataset_yaml_list[fold_number]
                 model_name = self._fold_name(fold_number)
                 model = self._train_model(dataset_yaml, model_name)
-                self._add_information_to_model_in_mlflow_if_neccesary()
+                self._add_information_to_model_in_mlflow_if_needed()
                 self._save_model_metrics(model_name, model)
                 self._clean_gpu_cache()  # This is necessary to avoid running out of memory
         else:
@@ -82,7 +82,7 @@ class TrainingScript:
                                                        self.validation_percentage)
             model_name = "single_model"
             model = self._train_model(dataset_yaml, model_name)
-            self._add_information_to_model_in_mlflow_if_neccesary()
+            self._add_information_to_model_in_mlflow_if_needed()
             self._save_model_metrics(model_name, model)
 
         self._export_results()
@@ -374,7 +374,7 @@ class TrainingScript:
 
     # Mlflow
 
-    def _add_information_to_model_in_mlflow_if_neccesary(self):
+    def _add_information_to_model_in_mlflow_if_needed(self):
         if self.use_mlflow:
             experiment = mlflow.get_experiment_by_name(self.mlflow_experiment_name)
             last_run_id = self._get_last_run_id_for(experiment)
