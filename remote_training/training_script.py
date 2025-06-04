@@ -7,7 +7,6 @@ import shutil
 from collections import Counter
 from pathlib import Path
 
-import mlflow
 import pandas as pd
 import torch
 import yaml
@@ -193,8 +192,9 @@ class TrainingScript:
             destination_image_path = self.dataset_path / image_name
             all_dataset_image_paths.append(destination_image_path)
 
-            google_cloud_image = self.source_images_bucket.blob(str(source_image_path))
-            google_cloud_image.download_to_filename(destination_image_path)
+            if not destination_image_path.exists():
+                google_cloud_image = self.source_images_bucket.blob(str(source_image_path))
+                google_cloud_image.download_to_filename(destination_image_path)
 
         return sorted(all_dataset_image_paths)
 
@@ -220,7 +220,6 @@ class TrainingScript:
                 ds_y,
             )
 
-        print(f"IMAGENES: {images}")
         images_to_move = max(int(len(images) * int(val_percentage) / 100), 1) # At least one image for validation
         random_image_indexes = random.sample(range(0, len(images) - 1), images_to_move)
         for idx, (image, label) in enumerate(zip(images, annotations)):
