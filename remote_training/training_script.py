@@ -131,6 +131,11 @@ class TrainingScript:
             self._export_annotations_from_label_studio("YOLO", yolo_annotations_path)
             shutil.unpack_archive(yolo_annotations_path, extract_dir=self.dataset_path)
 
+        labels_path = self.dataset_path / "labels"
+        for label_file in labels_path.glob("*.txt"):
+            new_label_filename = label_file.name.split("__", 1)[-1]
+            label_file.rename(labels_path / new_label_filename)
+
         with open(f"{self.dataset_path}/classes.txt", "r") as f:
             class_names = f.read().splitlines()
         yaml_data = {
@@ -337,17 +342,18 @@ class TrainingScript:
         augmentations = {
             "hsv_h": 0.015,
             "hsv_s": 0.7,
-            "hsv_v": 0.4,
+            "hsv_v": 0.7,
             "degrees": 4.0,
-            "translate": 0.1,
+            "translate": 0.2,
             "scale": 0.0,
-            "shear": 0.0,
-            "perspective": 0.0,
+            "shear": 3.0,
+            "perspective": 0.001,
             "flipud": 0.0,
             "fliplr": 0.0,
+            "bgr": 0.0,
             "mosaic": 1.0,
-            "mixup": 0.0,
-            "copy_paste": 0.0,
+            "mixup": 0.1,
+            "cutmix": 1.0,
         }
         return augmentations
 
