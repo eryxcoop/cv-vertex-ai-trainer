@@ -79,7 +79,7 @@ class CLI:
             source_images_bucket=config["google_cloud"].get("source_images_bucket"),
             source_images_directory=config["google_cloud"].get("source_images_directory"),
             trained_models_bucket=config["google_cloud"].get("trained_models_bucket"),
-            validation_percentage=config[""].get("single_dataset_val_percentage"),
+            validation_percentage=config["training"].get("validation_percentage"),
         )
 
     def _run_remote(self, config, training_config):
