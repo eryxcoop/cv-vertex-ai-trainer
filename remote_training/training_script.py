@@ -1,6 +1,7 @@
 import datetime
 import gc
 import logging
+import math
 import os
 import random
 import shutil
@@ -59,6 +60,8 @@ class TrainingScript:
         self.trained_models_bucket_name = os.environ['TRAINED_MODELS_BUCKET']
 
     def run(self):
+        # Number of contiguous images
+        image_group_size = 100
         if not self.use_mlflow:
             self._turn_off_mlflow_logging_on_yolo()
 
@@ -78,7 +81,7 @@ class TrainingScript:
         else:
             dataset_path = self.single_dataset_path
             dataset_yaml = self._create_single_dataset(annotations, class_names, images, dataset_path,
-                                                       self.validation_percentage)
+                                                       self.validation_percentage, image_group_size)
             model_name = "single_model"
             model = self._train_model(dataset_yaml, model_name)
             self._add_information_to_model_in_mlflow_if_needed()
@@ -203,37 +206,83 @@ class TrainingScript:
 
         return sorted(all_dataset_image_paths)
 
-    def _create_single_dataset(self, annotations, class_names, images, datasets_path, val_percentage):
+    def _create_single_dataset(self, annotations, class_names, images, datasets_path, val_percentage, image_group_size):
         folder_name = 'single_dataset'
         model_info_dir = datasets_path / folder_name
         model_info_dir.mkdir(parents=True, exist_ok=True)
-        (model_info_dir / "train" / "images").mkdir(parents=True, exist_ok=True)
-        (model_info_dir / "train" / "labels").mkdir(parents=True, exist_ok=True)
-        (model_info_dir / "val" / "images").mkdir(parents=True, exist_ok=True)
-        (model_info_dir / "val" / "labels").mkdir(parents=True, exist_ok=True)
 
-        dataset_yaml = model_info_dir / f"dataset.yaml"
+        # Crear estructura de directorios
+        for subset in ['train', 'val', 'test']:
+            (model_info_dir / subset / "images").mkdir(parents=True, exist_ok=True)
+            (model_info_dir / subset / "labels").mkdir(parents=True, exist_ok=True)
 
+        # Crear archivo YAML
+        dataset_yaml = model_info_dir / "dataset.yaml"
         with open(dataset_yaml, "w") as ds_y:
             yaml.safe_dump(
                 {
                     "path": f"{self.base_path}/{model_info_dir.as_posix()}",
                     "train": "train",
                     "val": "val",
+                    "test": "test",
                     "names": class_names,
                 },
                 ds_y,
             )
 
-        images_to_move = max(int(len(images) * int(val_percentage) / 100), 1) # At least one image for validation
-        random_image_indexes = random.sample(range(0, len(images) - 1), images_to_move)
-        for idx, (image, label) in enumerate(zip(images, annotations)):
-            val_or_train_folder = 'val' if idx in random_image_indexes else 'train'
-            image_name = image.name.split("__", 1)[-1]
-            label_name = label.name.split("__", 1)[-1]
-            shutil.copy(image, datasets_path / folder_name / val_or_train_folder / 'images' / image_name)
-            shutil.copy(label, datasets_path / folder_name / val_or_train_folder / 'labels' / label_name)
+        num_images = len(images)
+        num_groups = math.ceil(num_images / image_group_size)
 
+        for group_idx in range(num_groups):
+            start_idx = group_idx * image_group_size
+            end_idx = min((group_idx + 1) * image_group_size, num_images)
+            group_images = images[start_idx:end_idx]
+            group_anns = annotations[start_idx:end_idx]
+
+            group_size = len(group_images)
+
+            # Cálculo preciso garantizando al menos 1 imagen en val y test si group_size >= 7
+            train_size = round(group_size * 0.8)
+            val_size = round(group_size * 0.15)
+            test_size = group_size - train_size - val_size
+
+            # Ajuste para asegurar que todos los splits tengan imágenes
+            if val_size == 0 and group_size > 1:
+                train_size -= 1
+                val_size = 1
+            if test_size == 0 and group_size > 2:
+                train_size -= 1
+                test_size = 1
+
+            # Dividir los grupos
+            train_images = group_images[:train_size]
+            train_anns = group_anns[:train_size]
+
+            val_images = group_images[train_size:train_size+val_size]
+            val_anns = group_anns[train_size:train_size+val_size]
+
+            test_images = group_images[train_size+val_size:]
+            test_anns = group_anns[train_size+val_size:]
+
+            # Función auxiliar para copiar archivos
+            def copy_files(images, annotations, subset):
+                for image, label in zip(images, annotations):
+                    image_name = image.name.split("__", 1)[-1]
+                    label_name = label.name.split("__", 1)[-1]
+                    shutil.copy(image, model_info_dir / subset / "images" / image_name)
+                    shutil.copy(label, model_info_dir / subset / "labels" / label_name)
+
+            # Copiar a los directorios correspondientes
+            copy_files(train_images, train_anns, 'train')
+            copy_files(val_images, val_anns, 'val')
+            copy_files(test_images, test_anns, 'test')
+
+        # Verificación final
+        print(f"Distribución final:")
+        print(f"- Train: {len(list((model_info_dir / 'train' / 'images').glob('*')))} imágenes")
+        print(f"- Val: {len(list((model_info_dir / 'val' / 'images').glob('*')))} imágenes")
+        print(f"- Test: {len(list((model_info_dir / 'test' / 'images').glob('*')))} imágenes")
+    
         return dataset_yaml
 
     def _create_k_folds(self, annotations, class_names, images, datasets_path):
@@ -340,20 +389,21 @@ class TrainingScript:
 
     def _augmentations(self):
         augmentations = {
-            "hsv_h": 0.015,
-            "hsv_s": 0.7,
+            "hsv_h": 0.05,
+            "hsv_s": 0.5,
             "hsv_v": 0.7,
-            "degrees": 4.0,
-            "translate": 0.2,
-            "scale": 0.0,
+            "degrees": 12.0,
+            "translate": 0.1,
+            "scale": 0.5,
             "shear": 3.0,
-            "perspective": 0.001,
+            "perspective": 0.0001,
             "flipud": 0.0,
-            "fliplr": 0.0,
+            "fliplr": 0.5,
             "bgr": 0.0,
-            "mosaic": 1.0,
+            "mosaic": 0.5,
             "mixup": 0.1,
-            "cutmix": 1.0,
+            "cutmix": 0.5,
+            "erasing": 0.4
         }
         return augmentations
 
@@ -363,13 +413,13 @@ class TrainingScript:
     # Exporting results
 
     def _save_model_metrics(self, fold_name, model):
-        metrics = model.metrics.box
+        metrics = model.val(split="test", single_cls=True, plots=True, visualize=True)
         results = pd.DataFrame(
             {
-                "p": metrics.p,
-                "r": metrics.r,
-                "map50": metrics.ap50,
-                "map50-95": metrics.ap,
+                "p": metrics.box.p,
+                "r": metrics.box.r,
+                "map50": metrics.box.ap50,
+                "map50-95": metrics.box.ap,
             }
         )
         results.to_csv(f"{self.training_results_path}/{fold_name}/metrics.csv")
