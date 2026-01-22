@@ -86,7 +86,6 @@ class TrainingScript:
         return class_names, annotations
 
     def extract_image_name(self, task):
-        # TODO REVISAR ESTO
         import base64
         from urllib.parse import urlparse, parse_qs
 
@@ -238,7 +237,7 @@ class TrainingScript:
     # Exporting results
 
     def _save_model_metrics(self, fold_name, model):
-        metrics = model.val(split="test", single_cls=True, plots=True, visualize=True)
+        metrics = model.val(split="test", single_cls=True, plots=True, visualize=True, name="testing")
         results = pd.DataFrame(
             {
                 "p": metrics.box.p,
