@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import math
 import os
@@ -35,7 +36,6 @@ class TrainingScript:
         self.mlflow_experiment_name = os.environ["MLFLOW_EXPERIMENT_NAME"]
 
         self.accelerator_count = int(os.environ["ACCELERATOR_COUNT"])
-        self.rank = os.environ["RANK"]
 
         self.label_studio_url = os.environ["LABEL_STUDIO_URL"]
         self.label_studio_token = os.environ["LABEL_STUDIO_TOKEN"]
@@ -125,7 +125,8 @@ class TrainingScript:
             return Path(parsed_url.path).name
 
     def _download_labeled_dataset_images(self):
-        labeled_tasks = self.label_studio_project.get_labeled_tasks() # TODO: CAGADA ACA
+        with open("labeled_tasks.json", "r", encoding="utf-8") as f:
+            labeled_tasks = json.load(f)
         labeled_image_names = list(map(self.extract_image_name, labeled_tasks))
 
         all_dataset_image_paths = []
