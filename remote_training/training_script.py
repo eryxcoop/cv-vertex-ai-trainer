@@ -1,6 +1,5 @@
 import datetime
 import json
-import logging
 import math
 import os
 import shutil
@@ -8,56 +7,39 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-import yaml
-
 import ultralytics.utils
+import yaml
 from ultralytics import YOLO
-from label_studio_sdk import Client as LabelStudioClient
 
 
 class TrainingScript:
     def __init__(self) -> None:
-        self.image_size = [int(size) for size in os.environ["IMAGE_SIZE"].replace(" ", "").split(",")]
-        self.epochs = int(os.environ["EPOCHS"])
-        self.model = os.environ["MODEL"]
-        self.obb = os.environ["OBB"] == "True"
+        image_size = [640, 384]
+        epochs = 250
+        base_model = "yolo11s.pt"
+        validation_percentage = 15
+
+        self.image_size = image_size
+        self.epochs = epochs
+        self.model = base_model
         self.base_path = os.getcwd()
         self.dataset_path = Path("dataset")
-        self.number_folds = int(os.environ["NUMBER_OF_FOLDS"])
-        self.use_kfold = (os.environ["USE_KFOLD"] == "True")
         self.save_path = self._define_save_path()
         self.training_results_path = self.save_path / "training_results"
         self.fold_datasets_path = self.save_path / "folds_datasets"
         self.single_dataset_path = self.save_path / "single_dataset"
-        self.validation_percentage = os.environ["VALIDATION_PERCENTAGE"]
-
-        self.use_mlflow = (os.environ["USE_MLFLOW"] == "True")
-        self.mlflow_model_name = os.environ["MLFLOW_MODEL_NAME"]
-        self.mlflow_experiment_name = os.environ["MLFLOW_EXPERIMENT_NAME"]
-
-        self.accelerator_count = int(os.environ["ACCELERATOR_COUNT"])
-
-        self.label_studio_url = os.environ["LABEL_STUDIO_URL"]
-        self.label_studio_token = os.environ["LABEL_STUDIO_TOKEN"]
-        self.label_studio_project_id = int(os.environ["LABEL_STUDIO_PROJECT_ID"])
-        label_studio = LabelStudioClient(url=self.label_studio_url, api_key=self.label_studio_token)
-        self.label_studio_project = label_studio.get_project(self.label_studio_project_id)
-
-        self.source_images_directory = Path(os.environ["SOURCE_IMAGES_DIRECTORY"])
-        self.trained_models_bucket_name = os.environ['TRAINED_MODELS_BUCKET']
+        self.validation_percentage = validation_percentage
+        # Number of contiguous images
+        self.image_group_size = 100
 
     def run(self):
-        # Number of contiguous images
-        image_group_size = 100
-        if not self.use_mlflow:
-            self._turn_off_mlflow_logging_on_yolo()
+        self._turn_off_mlflow_logging_on_yolo()
 
         class_names, annotations = self._download_dataset_annotations()
         images = self._download_labeled_dataset_images()
 
-        dataset_path = self.single_dataset_path
-        dataset_yaml = self._create_single_dataset(annotations, class_names, images, dataset_path,
-                                                   self.validation_percentage, image_group_size)
+        dataset_yaml = self._create_single_dataset(annotations, class_names, images, self.single_dataset_path,
+                                                   self.validation_percentage, self.image_group_size)
         model_name = "single_model"
         model = self._train_model(dataset_yaml, model_name)
         self._save_model_metrics(model_name, model)
@@ -72,10 +54,8 @@ class TrainingScript:
 
     def _check_if_gpu_is_available(self):
         gpu_available = torch.cuda.is_available()
-        logging.info(f"Checking if GPU is available: {gpu_available}")
-        if self.accelerator_count > 0 and not gpu_available:
-            logging.error(f"GPU is not available, accelerator count: {self.accelerator_count}")
-            exit(1)
+        if not gpu_available:
+            print(f"---- GPU is not available ----")
         return gpu_available
 
     # Dataset
@@ -188,11 +168,11 @@ class TrainingScript:
             train_images = group_images[:train_size]
             train_anns = group_anns[:train_size]
 
-            val_images = group_images[train_size:train_size+val_size]
-            val_anns = group_anns[train_size:train_size+val_size]
+            val_images = group_images[train_size:train_size + val_size]
+            val_anns = group_anns[train_size:train_size + val_size]
 
-            test_images = group_images[train_size+val_size:]
-            test_anns = group_anns[train_size+val_size:]
+            test_images = group_images[train_size + val_size:]
+            test_anns = group_anns[train_size + val_size:]
 
             # Función auxiliar para copiar archivos
             def copy_files(images, annotations, subset):
@@ -212,7 +192,7 @@ class TrainingScript:
         print(f"- Train: {len(list((model_info_dir / 'train' / 'images').glob('*')))} imágenes")
         print(f"- Val: {len(list((model_info_dir / 'val' / 'images').glob('*')))} imágenes")
         print(f"- Test: {len(list((model_info_dir / 'test' / 'images').glob('*')))} imágenes")
-    
+
         return dataset_yaml
 
     # Training
